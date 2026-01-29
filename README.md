@@ -31,7 +31,8 @@ Main Goals:
 ### 3. Better Utilities
 - [x] Store chat history locally (IndexedDB)
 - [x] Search bar
-- [ ] WebWorker full text search
+- [x] Full text search
+- [ ] Optimized DB operations
 - [ ] Resize / Hide sidebar
 - [ ] Responsive UI / Phone support
 
