@@ -45,7 +45,8 @@ Main Goals:
 
 ### 5. Even Better Markdown
 - [x] Copy button
-- [ ] Correct LaTeX Copying
+- [x] Correct LaTeX Copying
+- [x] Markdown tables
 - [ ] Support the checklist syntax
 - [x] Skip CJK "Enter" button in input box 
 - [x] Fix CJK characters bolding in markdown
