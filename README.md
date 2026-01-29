@@ -40,6 +40,7 @@ Main Goals:
 - [x] Load large libraries in the background
 - [x] Auto-scrolling (disabled by default)
 - [x] Auto-focus
+- [ ] Scroll chaining
 - [ ] Memorize scrolling position
 - [ ] Command+Click for a new window
 
