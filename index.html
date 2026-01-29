@@ -55,18 +55,13 @@
 
     </div>
 
-    <!-- div for shadow -->
-    <div class="relative min-h-0 flex flex-grow overflow-hidden border-red-500">
-      <div class="px-2 flex-grow overflow-y-scroll">
-        <div class="pl-2 py-0 text-gray-300 select-none">Recent</div>
-        <!-- sessionList here -->
-        <div id="sessionList"></div>
-        <div class="w-fit mx-auto text-2xl py-1 select-none">☁️</div>
-      </div>
-      <div class="absolute z-10 bottom-0 w-full h-2 bg-gradient-to-t from-gray-50 to-transparent pointer-events-none">
-      </div>
+    <div class="min-h-0 flex-grow overflow-y-scroll px-2">
+      <div class="pl-2 py-0 text-gray-300 select-none">Recent</div>
+      <!-- sessionList here -->
+      <div id="sessionList"></div>
+      <div class="w-fit mx-auto text-2xl py-1 select-none">☁️</div>
     </div>
-    <div class="mx-2 mb-1 flex">
+    <div class="px-2 pb-1 pt-1 flex border-t border-gray-200">
       <select class="flex-grow h-10 px-2 rounded-lg bg-gray-50 @hover:bg-gray-200 appearance-none focus:outline-none">
         <option value="none">💡 gemini-3-flash-preview</option>
       </select>
@@ -132,14 +127,37 @@
     const searchInput = document.getElementById('searchInput');
     const settingsBtn = document.getElementById('settingsBtn');
 
-    setTimeout(() => {
-      userInput.focus();
-    }, 100);
 
+
+    // --- Global State ---
     let messages = [];
     let currentSessionId = null;
     let db = null;
 
+
+
+    // autofocus
+    setTimeout(() => {
+      userInput.focus();
+    }, 100);
+    document.addEventListener('DOMContentLoaded', () => {
+      userInput.focus();
+    });
+    // capture uneffective keydown events
+    document.addEventListener('keydown', (e) => {
+      const activeEl = document.activeElement;
+      if (activeEl.tagName === 'INPUT' ||
+        activeEl.tagName === 'TEXTAREA' ||
+        activeEl.isContentEditable) return;
+
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+      if (window.getSelection().toString().length > 0) return;
+
+      if (e.key.length === 1 && e.key !== ' ') {
+        userInput.focus();
+      }
+    });
 
 
     // set up markdown styles with unocss
@@ -164,14 +182,14 @@
       '.prose hr': 'border-t border-gray-200 my-4',
 
       // lists
-      '.prose ul': 'list-disc ml-6',
-      '.prose ol': 'list-decimal ml-6',
+      '.prose ul': 'mt-2 mb-1 list-disc ml-6',
+      '.prose ol': 'mt-2 mb-1 list-decimal ml-6',
       '.prose li': '',
 
       // '.prose table': 'table-auto w-full border-collapse text-left overflow-x-auto',
 
       // table
-      '.prose table': 'w-full border-collapse table-auto',
+      '.prose table': 'mt-2 mb-1 w-full border-collapse table-auto',
       '.prose thead tr': ' border-b border-gray-300',
       '.prose tbody tr': 'border-b border-gray-200',
       '.prose tbody tr:last-child': 'border-b-0',
@@ -209,10 +227,10 @@
           .map(rule => rule.style?.cssText || "")
           .join('\n');
         // for example: margin:0.5rem;
-        console.log(tag, className);
-        console.log(css);
-        console.log(styleBody);
-        console.log('---')
+        // console.log(tag, className);
+        // console.log(css);
+        // console.log(styleBody);
+        // console.log('---')
 
         combinedRules += `${tag} {\n${styleBody}\n}\n`;
       }
@@ -266,7 +284,7 @@
         el.onerror = reject;
         document.head.appendChild(el);
       })));
-      console.log(window.markdownit, window.hljs, window.katex, window.texmath);
+      // console.log(window.markdownit, window.hljs, window.katex, window.texmath);
 
       mdRenderer = window.markdownit({
         html: true,
@@ -351,7 +369,7 @@
         };
         request.onsuccess = (event) => {
           db = event.target.result;
-          console.log(db)
+          // console.log(db)
           resolve(db);
         };
         request.onerror = (event) => reject(event.target.error);
@@ -429,7 +447,7 @@
 
     function replaceDom(target, content) {
       // dfs DOM diffing for better ui
-      // equivalent to: target.replaceChildren(content.childNodes)
+      // equivalent to: target.replaceChildren(...content.childNodes)
       const targetChildren = Array.from(target.childNodes);
       const contentChildren = Array.from(content.childNodes);
 
@@ -498,7 +516,7 @@
           msgDiv.id = 'streaming-msg';
           msgDiv.className = 'prose';
           chatHistory.appendChild(msgDiv);
-        } 
+        }
         // msgDiv.replaceChildren(renderMarkdown(content))
         replaceDom(msgDiv, renderMarkdown(content));
       } else {
@@ -588,21 +606,30 @@
 
     // if user is in some input method (eg. Chinese), don't treat Enter as submit
     let isComposing = false;
+    let isComposingChangeTime = -100;
     userInput.addEventListener('compositionstart', function () {
       console.log('composition start')
       isComposing = true;
+      isComposingChangeTime = performance.now();
     });
     userInput.addEventListener('compositionend', async function () {
       console.log('composition end')
-      await nextAnimationFrame();
-      await nextAnimationFrame();
       isComposing = false;
+      isComposingChangeTime = performance.now();
     });
 
     userInput.addEventListener('keydown', function (e) {
       // call API if Enter is pressed, but not Shift+Enter
       // console.log(e, e.key, e.isComposing)
-      if (e.key === 'Enter' && !e.shiftKey && !isComposing) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        if (isComposing || (performance.now() - isComposingChangeTime < 50)) {
+          console.log(
+            'skipped Enter due to composition', 
+            isComposing, isComposingChangeTime, performance.now(),
+            performance.now() - isComposingChangeTime
+          );
+          return;
+        }
         runLlm();
         e.preventDefault();  // don't insert newline
         // restore height to 1 line
@@ -617,6 +644,12 @@
       // console.log(height, window.innerHeight);
       height = Math.min(height, 0.45 * window.innerHeight);
       userInput.style.height = height + 'px';  // set new height
+
+      requestAnimationFrame(() => {
+        let height = userInput.scrollHeight;
+        height = Math.min(height, 0.45 * window.innerHeight);
+        userInput.style.height = height + 'px';  // set new height
+      });
     });
 
     runLlmButton.onclick = runLlm;
