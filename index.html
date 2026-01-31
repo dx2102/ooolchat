@@ -55,7 +55,7 @@
         class="w-full py-2 px-3 rounded-lg bg-gray-50 hover:bg-gray-200 placeholder-black focus:placeholder-gray-600 focus:outline-none">
     </div>
 
-    <div class="px-2">
+    <div class="px-2 flex-grow">
       <div class="pl-2 py-0 text-gray-300 select-none">Recent</div>
       <!-- sessionList here -->
       <div id="sessionList"></div>
@@ -63,8 +63,11 @@
     </div>
     
     <div class="sticky bottom-0 px-2 py-1 flex bg-gray-50 border-t  border-gray-200">
-      <select class="flex-grow h-10 px-2 rounded-lg bg-gray-50 @hover:bg-gray-200 appearance-none focus:outline-none">
-        <option value="none">💡 gemini-3-flash-preview</option>
+      <select id="modelSelector" class="flex-grow h-10 px-2 rounded-lg bg-gray-50 @hover:bg-gray-200 appearance-none focus:outline-none">
+        <option value="google/gemini-3-flash-preview">💡 Gemini 3 Flash</option>
+        <option value="x-ai/grok-4.1-fast">💡 Grok 4.1 Fast</option>
+        <option value="deepseek/deepseek-r1-0528:free">💡 Deepseek R1 0528 (free)</option>
+        <option value="moonshotai/kimi-k2.5">💡 Kimi K2.5</option>
       </select>
       <!-- <div class="my-1 border-l border-gray-300"></div> -->
       <button id="settingsBtn" title="Settings" class="w-10 h-10 rounded-lg bg-gray-100 @hover:bg-gray-200
@@ -78,10 +81,9 @@
     <!-- scroll area inside the anchor -->
     <div class="flex-grow select-none">
       <!-- do mx-auto -->
-      <div id="chatHistory" class="select-text mx-main  pt-8   flex flex-col gap-4">
+      <div id="chatHistory" class="select-text mx-main  pt-8 pb-[40vh]  flex flex-col gap-4">
         <!-- chatHistory here -->
       </div>
-      <div class="pb-[50vh]"></div>
     </div>
 
     <!-- input bar -->
@@ -126,6 +128,7 @@
     const sessionList = document.getElementById('sessionList');
     const newChatBtn = document.getElementById('newChatBtn');
     const searchInput = document.getElementById('searchInput');
+    const modelSelector = document.getElementById('modelSelector');
     const settingsBtn = document.getElementById('settingsBtn');
 
 
@@ -150,6 +153,23 @@
       if (activeEl.tagName === 'INPUT' ||
         activeEl.tagName === 'TEXTAREA' ||
         activeEl.isContentEditable) return;
+
+      // allow pasting
+      if ((e.ctrlKey || e.metaKey) && e.key == 'v') {
+        userInput.focus();
+        return;
+      }
+
+      // capture Enter
+      if (e.key === 'Enter') {
+        // trigger userInput keydown
+        const event = new KeyboardEvent('keydown', {
+          key: e.key, keyCode: e.keyCode, 
+          bubbles: false,
+        });
+        userInput.dispatchEvent(event);
+        return;
+      }
 
       if (e.ctrlKey || e.metaKey || e.altKey) return;
 
@@ -183,8 +203,8 @@
       '.prose hr': 'border-t border-gray-200 my-4',
 
       // lists
-      '.prose ul': 'mt-2 mb-1 list-disc ml-6',
-      '.prose ol': 'mt-2 mb-1 list-decimal ml-6',
+      '.prose ul': 'list-disc ml-6',
+      '.prose ol': 'list-decimal ml-6',
       '.prose li': '',
 
       // '.prose table': 'table-auto w-full border-collapse text-left overflow-x-auto',
@@ -208,7 +228,7 @@
       '.prose pre code': 'bg-transparent p-0 rounded-none',
 
       '.copy-btn': 'absolute top-2 right-2 px-2 py-1 rounded-lg bg-gray-100',
-      '.prose pre:hover .copy-btn': 'opacity-100',
+      '.copy-btn:hover': 'bg-gray-200',
 
       '.katex-display': 'overflow-x-auto',
 
@@ -246,7 +266,6 @@
 
 
     // --- OpenAI Setup ---
-    const modelName = 'google/gemini-3-flash-preview';
     let openai = null;  // dynamic import in the background, while we set up the page
     async function loadOpenAI() {
       const OpenAI = (await import('https://cdn.skypack.dev/openai@6.9.1')).default;
@@ -609,12 +628,12 @@
     let isComposing = false;
     let isComposingChangeTime = -100;
     userInput.addEventListener('compositionstart', function () {
-      console.log('composition start')
+      // console.log('composition start')
       isComposing = true;
       isComposingChangeTime = performance.now();
     });
     userInput.addEventListener('compositionend', async function () {
-      console.log('composition end')
+      // console.log('composition end')
       isComposing = false;
       isComposingChangeTime = performance.now();
     });
@@ -674,6 +693,7 @@
 
       let fullResponse = '';
       try {
+        const modelName = modelSelector.value;
         const stream = await openai.chat.completions.create({
           messages: messages,
           model: modelName,
@@ -687,8 +707,9 @@
           appendMessage('assistant', fullResponse, true);
         }
       } catch (error) {
-        fullResponse = `API Error: ${error.message}`;
-        appendMessage('assistant', fullResponse, true);
+        // fullResponse += `\n\n>API Error: ${error.message}`;
+        // appendMessage('assistant', fullResponse, true);
+        alert(`API Error: ${error.message}`);
         console.error("API Error:", error);
       }
 
