@@ -61,9 +61,10 @@
       <div id="sessionList"></div>
       <div class="w-fit mx-auto text-2xl py-1 select-none">☁️</div>
     </div>
-    
+
     <div class="sticky bottom-0 px-2 py-1 flex bg-gray-50 border-t  border-gray-200">
-      <select id="modelSelector" class="flex-grow h-10 px-2 rounded-lg bg-gray-50 @hover:bg-gray-200 appearance-none focus:outline-none">
+      <select id="modelSelector"
+        class="flex-grow h-10 px-2 rounded-lg bg-gray-50 @hover:bg-gray-200 appearance-none focus:outline-none">
         <option value="google/gemini-3-flash-preview">💡 Gemini 3 Flash</option>
         <option value="x-ai/grok-4.1-fast">💡 Grok 4.1 Fast</option>
         <option value="deepseek/deepseek-r1-0528:free">💡 Deepseek R1 0528 (free)</option>
@@ -100,7 +101,7 @@
         <!-- The textarea. Simply bg-white. -->
         <div class="flex items-center border border-gray-300 rounded-3xl shadow-sm bg-white">
           <textarea id="userInput"
-            class="min-w-0 flex-grow bg-transparent pl-5 pt-3 pb-2 mb-1 resize-none focus:outline-none placeholder:pl-0.5"
+            class="min-w-0 max-h-[40vh] flex-grow bg-transparent pl-5 pt-3 pb-3  resize-none focus:outline-none placeholder:pl-0.5"
             rows="1" placeholder="Ask me anything"></textarea>
           <!-- 
             self-end keeps the button at the bottom when textarea grows
@@ -164,7 +165,7 @@
       if (e.key === 'Enter') {
         // trigger userInput keydown
         const event = new KeyboardEvent('keydown', {
-          key: e.key, keyCode: e.keyCode, 
+          key: e.key, keyCode: e.keyCode,
           bubbles: false,
         });
         userInput.dispatchEvent(event);
@@ -382,7 +383,7 @@
       return new Promise((resolve, reject) => {
         const request = indexedDB.open('chat-db', 1);
         request.onupgradeneeded = (event) => {
-          const db = event.target.result;
+          db = event.target.result;
           if (!db.objectStoreNames.contains('sessions')) {
             db.createObjectStore('sessions', { keyPath: 'id' });
           }
@@ -460,9 +461,76 @@
 
     // --- sidebar ui logic ---
 
+    function matchSession(keyword, session) {
+      if (!keyword) return true;
+      for (const msg of session.messages) {
+        if (msg.content.toLowerCase().includes(keyword)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    async function renderSidebar() {
+      const sessions = await loadAllSessions();
+      sessionList.innerHTML = '';
+
+      const filter = searchInput.value.toLowerCase().trim();
+
+      sessions.forEach(s => {
+        if (!matchSession(filter, s)) return;
+
+        const div = document.createElement('div');
+        const isActive = s.id === currentSessionId;
+
+        div.className = `p-2 rounded-lg cursor-pointer text-nowrap truncate select-none 
+            ${isActive ? 'bg-gray-200' : '@hover:bg-gray-200'}`;
+        div.innerText = s.title.replaceAll('\n', ' ') || 'New Chat';
+        div.onmousedown = () => switchToSession(s.id);
+        sessionList.appendChild(div);
+      });
+    }
+
+    (async () => {
+      await initDB();
+      await renderSidebar();
+    })();
+    // ios safari might invalidate db connection when user comes back. Re-init on pageshow.
+    window.addEventListener('visibilitychange', async (event) => {
+      console.log('visibilitychange', document.visibilityState);
+      try {
+        if (db) db.close();
+        db = null;
+      } catch (e) {
+        console.error('Error closing db:', e);
+      }
+      await initDB();
+      await renderSidebar();
+    });
+
     function clearChat() {
       chatHistory.innerHTML = '';
       messages = [];
+    }
+
+
+    async function switchToSession(id) {
+      const session = await loadSession(id);
+      if (!session) return;
+
+      currentSessionId = session.id;
+      clearChat();
+      messages = session.messages || [];
+      messages.forEach(msg => appendMessage(msg.role, msg.content, false));
+      renderSidebar();
+      requestAnimationFrame(() => userInput.focus());
+    }
+
+    function createNewChat() {
+      currentSessionId = null;
+      clearChat();
+      renderSidebar();
+      requestAnimationFrame(() => userInput.focus());
     }
 
     function replaceDom(target, content) {
@@ -488,7 +556,7 @@
 
         // same nodeType/tagName -> update attributes and recurse
         if (oldChild.nodeType === Node.ELEMENT_NODE) {
-          updateAttributes(oldChild, newChild);
+          replaceAttributes(oldChild, newChild);
           replaceDom(oldChild, newChild);
         } else if (oldChild.nodeType === Node.TEXT_NODE) {
           // update text
@@ -505,7 +573,7 @@
     }
 
     // aux function: sync attributes
-    function updateAttributes(target, content) {
+    function replaceAttributes(target, content) {
       // remove old attributes not in content
       Array.from(target.attributes).forEach(attr => {
         if (!content.hasAttribute(attr.name)) {
@@ -563,54 +631,7 @@
       }
     }
 
-    async function switchToSession(id) {
-      const session = await loadSession(id);
-      if (!session) return;
 
-      currentSessionId = session.id;
-      clearChat();
-      messages = session.messages || [];
-      messages.forEach(msg => appendMessage(msg.role, msg.content, false));
-      renderSidebar();
-      requestAnimationFrame(() => userInput.focus());
-    }
-
-    function createNewChat() {
-      currentSessionId = null;
-      clearChat();
-      renderSidebar();
-      requestAnimationFrame(() => userInput.focus());
-    }
-
-    function matchSession(keyword, session) {
-      if (!keyword) return true;
-      for (const msg of session.messages) {
-        if (msg.content.toLowerCase().includes(keyword)) {
-          return true;
-        }
-      }
-      return false;
-    }
-
-    async function renderSidebar() {
-      const sessions = await loadAllSessions();
-      sessionList.innerHTML = '';
-
-      const filter = searchInput.value.toLowerCase().trim();
-
-      sessions.forEach(s => {
-        if (!matchSession(filter, s)) return;
-
-        const div = document.createElement('div');
-        const isActive = s.id === currentSessionId;
-
-        div.className = `p-2 rounded-lg cursor-pointer text-nowrap truncate select-none 
-            ${isActive ? 'bg-gray-200' : '@hover:bg-gray-200'}`;
-        div.innerText = s.title.replaceAll('\n', ' ') || 'New Chat';
-        div.onmousedown = () => switchToSession(s.id);
-        sessionList.appendChild(div);
-      });
-    }
 
     // --- chat ui logic ---
 
@@ -662,12 +683,10 @@
       userInput.style.height = 'auto';  // let the browser determine text height
       let height = userInput.scrollHeight;
       // console.log(height, window.innerHeight);
-      height = Math.min(height, 0.45 * window.innerHeight);
       userInput.style.height = height + 'px';  // set new height
 
       requestAnimationFrame(() => {
         let height = userInput.scrollHeight;
-        height = Math.min(height, 0.45 * window.innerHeight);
         userInput.style.height = height + 'px';  // set new height
       });
     });
@@ -723,15 +742,7 @@
       await saveSessionToDB();
     }
 
-    // --- Init ---
-    (async () => {
-      await initDB();
-      await renderSidebar();
 
-      if (currentSessionId === null) {
-        // Initial state does not automatically clear, preserving the default value for demonstration
-      }
-    })();
 
   </script>
 </body>
