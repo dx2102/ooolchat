@@ -685,10 +685,10 @@
       // console.log(height, window.innerHeight);
       userInput.style.height = height + 'px';  // set new height
 
-      requestAnimationFrame(() => {
+      setTimeout(() => {
         let height = userInput.scrollHeight;
         userInput.style.height = height + 'px';  // set new height
-      });
+      }, 20);
     });
 
     runLlmButton.onclick = runLlm;
