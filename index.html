@@ -357,12 +357,7 @@
     loadMarkdownLibs();
 
     function renderMarkdown(text) {
-      // text = fixCJK(text);
       let html = mdRenderer.render(text);
-      // html = html.replaceAll('\u200B', '');
-      // html = html.replaceAll('\x07', '');
-      // html = html.replaceAll('🥣', '');
-
       let dom = (new DOMParser()).parseFromString(html, 'text/html').body;
 
       // add copy buttons to pre
@@ -373,6 +368,7 @@
         btn.innerText = 'Copy';
         // mousedown is faster than click
         btn.onmousedown = () => {
+          console.log('copy code');
           const text = pre.querySelector('code').innerText.trim();
           navigator.clipboard.writeText(text).then(() => {
             btn.innerText = 'Copied!';
@@ -548,8 +544,10 @@
     }
 
     function replaceDom(target, content) {
-      // dfs DOM diffing for better ui
+      // dfs DOM diffing to minimize DOM operations
       // equivalent to: target.replaceChildren(...content.childNodes)
+      // some children in target will directly point to content instead of cloning
+      // to preserve js event listeners
       const targetChildren = Array.from(target.childNodes);
       const contentChildren = Array.from(content.childNodes);
 
@@ -558,13 +556,15 @@
 
         // no old child -> append new child
         if (!oldChild) {
-          target.appendChild(newChild.cloneNode(true));
+          // target.appendChild(newChild.cloneNode(true));
+          target.appendChild(newChild);
           return;
         }
 
         // different nodeType/tagName -> cannot reuse old child, replace
         if (oldChild.nodeType !== newChild.nodeType || oldChild.tagName !== newChild.tagName) {
-          target.replaceChild(newChild.cloneNode(true), oldChild);
+          // target.replaceChild(newChild.cloneNode(true), oldChild);
+          target.replaceChild(newChild, oldChild);
           return;
         }
 
