@@ -101,15 +101,15 @@
         <!-- The textarea. Simply bg-white. -->
         <div class="flex items-center border border-gray-300 rounded-3xl shadow-sm bg-white">
           <textarea id="userInput"
-            class="min-w-0 max-h-[40vh] flex-grow bg-transparent pl-5 pt-3 pb-3  resize-none focus:outline-none placeholder:pl-0.5"
+            class="min-w-0 max-h-[40vh] flex-grow bg-transparent pl-5 pt-3 pb-3 pr-2  resize-none focus:outline-none placeholder:pl-0.5"
             rows="1" placeholder="Ask me anything"></textarea>
           <!-- 
-            self-end keeps the button at the bottom when textarea grows
+            self-end keeps the button at the bottom when textarea grows, not in the middle
             m-2 makes the button centered when textarea is 1 line
             If input bar becomes text-base, we need m-1.5
           -->
           <button id="runLlmButton" class="bg-gray-800 text-white 
-            rounded-full size-9 shrink-0 m-2 self-end 
+            rounded-full size-9 shrink-0 my-2 mr-2 self-end 
             flex items-center justify-center">
             ↑
           </button>
@@ -148,7 +148,7 @@
     document.addEventListener('DOMContentLoaded', () => {
       userInput.focus();
     });
-    // capture uneffective keydown events
+    // capture uneffective keydown events, when not focused on input
     document.addEventListener('keydown', (e) => {
       const activeEl = document.activeElement;
       if (activeEl.tagName === 'INPUT' ||
@@ -491,13 +491,10 @@
       });
     }
 
-    (async () => {
-      await initDB();
-      await renderSidebar();
-    })();
     // ios safari might invalidate db connection when user comes back. Re-init on pageshow.
-    window.addEventListener('visibilitychange', async (event) => {
-      console.log('visibilitychange', document.visibilityState);
+    async function resumePage(event) {
+      console.log(event, document.visibilityState);
+      userInput.dispatchEvent(new Event('input'))
       try {
         if (db) db.close();
         db = null;
@@ -506,7 +503,9 @@
       }
       await initDB();
       await renderSidebar();
-    });
+    }
+    window.addEventListener('visibilitychange', resumePage);
+    window.addEventListener('pageshow', resumePage);
 
     function clearChat() {
       chatHistory.innerHTML = '';
@@ -678,18 +677,22 @@
       }
     });
 
-    userInput.addEventListener('input', function (e) {
-      // automatic textarea height
-      userInput.style.height = 'auto';  // let the browser determine text height
-      let height = userInput.scrollHeight;
-      // console.log(height, window.innerHeight);
-      userInput.style.height = height + 'px';  // set new height
+    // userInput.addEventListener('input', function (e) {
+    //   // automatic textarea height
+    //   userInput.style.height = 'auto';  // let the browser determine text height
+    //   let height = userInput.scrollHeight;
+    //   userInput.style.height = height + 'px';  // set new height
 
-      setTimeout(() => {
-        let height = userInput.scrollHeight;
-        userInput.style.height = height + 'px';  // set new height
-      }, 20);
-    });
+    //   setTimeout(() => {
+    //     let height = userInput.scrollHeight;
+    //     userInput.style.height = height + 'px';  // set new height
+    //   }, 100);
+    // });
+    async function initAutosize() {
+      const { default: autosize } = await import('https://cdn.jsdelivr.net/npm/autosize@6.0.1/+esm');
+      autosize(userInput);
+    }
+    initAutosize();
 
     runLlmButton.onclick = runLlm;
 
