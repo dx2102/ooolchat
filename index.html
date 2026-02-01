@@ -43,7 +43,16 @@
 </head>
 
 <body un-cloak class="flex h-dvh bg-white font-sans touch-manipulation">
+  <!-- 
+    h-dvh: "device height". Different from h-screen.
+    In iOS Safari the browser bar can resize and take extra height.
+    h-dvh can make the website's height shrink accordingly, 
+    instead of overflowing like h-screen do.
 
+    touch-manipulation: disable "double-tap to zoom" for mobile devices
+
+    The "@hover:" below is a unocss feature. It won't trigger on touch devices.
+  -->
   <aside
     class="text-base w-72 overflow-y-scroll flex-shrink-0  bg-gray-50 border-r border-gray-200 overflow-hidden flex flex-col">
 
@@ -380,6 +389,18 @@
 
     // --- IndexedDB Logic ---
     async function initDB() {
+      console.log('init db')
+      if (db) {
+        try {
+          const tx = db.transaction('sessions', 'readonly');
+          if (tx) {
+            console.log('DB connection is healthy. Skipping re-init.');
+            return db;
+          }
+        } catch (e) {
+          console.error('Error testing db connection:', e);
+        }
+      }
       return new Promise((resolve, reject) => {
         const request = indexedDB.open('chat-db', 1);
         request.onupgradeneeded = (event) => {
@@ -495,16 +516,10 @@
     async function resumePage(event) {
       console.log(event, document.visibilityState);
       userInput.dispatchEvent(new Event('input'))
-      try {
-        if (db) db.close();
-        db = null;
-      } catch (e) {
-        console.error('Error closing db:', e);
-      }
       await initDB();
       await renderSidebar();
     }
-    window.addEventListener('visibilitychange', resumePage);
+    // window.addEventListener('visibilitychange', resumePage);  // seems like db open() is never resolved in the 'invisible' stage before the page shows up
     window.addEventListener('pageshow', resumePage);
 
     function clearChat() {
@@ -672,27 +687,30 @@
         }
         runLlm();
         e.preventDefault();  // don't insert newline
-        // restore height to 1 line
-        userInput.dispatchEvent(new Event('input'));
       }
     });
 
-    // userInput.addEventListener('input', function (e) {
-    //   // automatic textarea height
-    //   userInput.style.height = 'auto';  // let the browser determine text height
-    //   let height = userInput.scrollHeight;
-    //   userInput.style.height = height + 'px';  // set new height
+    userInput.addEventListener('input', function (e) {
+      // automatic textarea height
+      userInput.style.height = 'auto';  // let the browser determine text height
+      let height = userInput.scrollHeight;
+      userInput.style.height = height + 'px';  // set new height
+    });
+    // async function initAutosize() {
+    //   const { default: autosize } = await import('https://cdn.jsdelivr.net/npm/autosize@6.0.1/+esm');
+    //   autosize(userInput);
+    // }
+    // initAutosize();
+    userInput.addEventListener('input', (e) => {
+      // scroll to bottom if cursor is at the end
+      const cursorPosition = userInput.selectionStart;
+      const textLength = userInput.value.length;
+      if (cursorPosition === textLength) {
+        console.log('bottom')
+        userInput.scrollTop = 999999;
+      }
+    });
 
-    //   setTimeout(() => {
-    //     let height = userInput.scrollHeight;
-    //     userInput.style.height = height + 'px';  // set new height
-    //   }, 100);
-    // });
-    async function initAutosize() {
-      const { default: autosize } = await import('https://cdn.jsdelivr.net/npm/autosize@6.0.1/+esm');
-      autosize(userInput);
-    }
-    initAutosize();
 
     runLlmButton.onclick = runLlm;
 
@@ -706,6 +724,9 @@
       if (!text) return;
 
       userInput.value = '';
+      // restore height to 1 line when we modify the value
+      userInput.dispatchEvent(new Event('input'));
+
       appendMessage('user', text);
       messages.push({ role: 'user', content: text });
       console.log(messages);
