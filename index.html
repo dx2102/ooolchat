@@ -185,8 +185,12 @@
 
       if (window.getSelection().toString().length > 0) return;
 
-      if (e.key.length === 1 && e.key !== ' ') {
+      if (e.key.length === 1) {
         userInput.focus();
+      }
+      if (e.key === ' ') {
+        userInput.focus();
+        e.preventDefault();
       }
     });
 
