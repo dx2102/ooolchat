@@ -25,7 +25,10 @@
     }
   </script>
 
-  <!-- unocss + css reset -->
+  <!-- font awsome -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/css/all.min.css">
+
+  <!-- UnoCSS + CSS Reset -->
   <script>
     // configure unocss before loading the runtime
     window.__unocss = {
@@ -88,7 +91,7 @@
 
 </head>
 
-<body un-cloak class="text-lg flex h-dvh bg-white font-sans touch-manipulation no-scrollbar">
+<body un-cloak class="relative text-lg flex h-dvh bg-white font-sans touch-manipulation no-scrollbar">
   <!-- 
     h-dvh: "device height". Different from h-screen.
     In iOS Safari the browser bar can resize and take extra height.
@@ -99,13 +102,12 @@
 
     The "@hover:" below is a unocss feature. It won't trigger on touch devices.
   -->
-  <aside
+  <aside id="sideBar"
     class="text-base w-72 overflow-y-scroll flex-shrink-0  bg-gray-50 border-r border-gray-200 overflow-hidden flex flex-col">
 
     <!-- 
     sticky is better than flex/absolute because it can bubble scroll events upwards.
-    user can scroll the sidebar under these buttons, 
-    even when the mouse is over buttons.
+    user can scroll the sidebar even when the mouse is over buttons.
     -->
     <div class="sticky top-0 mx-2 py-1 bg-gray-50">
       <button id="newChatBtn" class="w-full py-2 px-3 rounded-lg bg-gray-50 hover:bg-gray-200 flex">
@@ -122,28 +124,48 @@
       <div class="w-fit mx-auto text-2xl py-1 select-none">☁️</div>
     </div>
 
-    <div class="sticky bottom-0 px-2 py-1 flex bg-gray-50 border-t  border-gray-200">
-      <label for="modelSelector" class="sr-only">Select Model</label>
-      <select id="modelSelector"
-        class="flex-grow h-10 px-2 rounded-lg bg-gray-50 @hover:bg-gray-200 appearance-none focus:outline-none">
-        <option value="google/gemini-3-flash-preview">💡 Gemini 3 Flash</option>
-        <option value="x-ai/grok-4.1-fast">💡 Grok 4.1 Fast</option>
-        <option value="deepseek/deepseek-r1-0528:free">💡 Deepseek R1 0528 (free)</option>
-        <option value="moonshotai/kimi-k2.5">💡 Kimi K2.5</option>
-      </select>
-      <button id="settingsBtn" title="Settings" class="w-10 h-10 rounded-lg bg-gray-100 @hover:bg-gray-200
+    <div class="sticky bottom-0 px-2 pt-1 flex flex-col bg-gray-50 border-t  border-gray-200">
+      <div class="flex">
+        <label for="modelSelector" class="sr-only">Select Model</label>
+        <select id="modelSelector"
+          class="flex-grow h-10 px-2 rounded-lg bg-gray-50 @hover:bg-gray-200 appearance-none focus:outline-none">
+          <option value="google/gemini-3-flash-preview">💡 Gemini 3 Flash</option>
+          <option value="x-ai/grok-4.1-fast">💡 Grok 4.1 Fast</option>
+          <option value="deepseek/deepseek-r1-0528:free">💡 Deepseek R1 0528 (free)</option>
+          <option value="moonshotai/kimi-k2.5">💡 Kimi K2.5</option>
+        </select>
+        <button id="settingsBtn" title="Settings" class="w-10 h-10 rounded-lg  @hover:bg-gray-200
         ">⚙️</button>
+      </div>
+      <div class="flex">
+        <a class="h-10 pl-2 text-gray-300 font-semibold flex items-center" href="https://github.com/dx2102/ooolchat/"
+          target="_blank">
+          <p>OoolChat</p>
+        </a>
+        <div class="flex-grow"></div>
+        <button id="foldBtn" title="Fold Sidebar" class="w-10 h-10 text-lg rounded-lg @hover:bg-gray-200
+        ">«</button>
+      </div>
     </div>
   </aside>
 
   <!-- main chat area -->
   <!-- anchor for the input bar -->
-  <main class="flex-grow overflow-y-scroll flex flex-col relative">
-    <div class="flex-grow select-none">
-      <div id="chatHistory" class="select-text px-main  pt-8  flex flex-col gap-4">
+  <main id="mainChat" class="flex-grow overflow-y-scroll flex flex-col">
+    <div class="absolute z-10 top-0 left-0 right-0 p-1">
+      <div id="sideBar2" class="rounded-lg bg-gray-50 w-fit">
+        <button id="newChatBtn2" class="w-10 h-10 rounded-lg bg-gray-50 hover:bg-gray-200">✏️</button>
+        <button id="foldBtn2" class="w-10 h-10 rounded-lg hover:bg-gray-200">»</button>
+      </div>
+    </div>
+
+    <div class="flex-grow select-none relative">
+      <div id="chatHistory" class="select-text pt-8 px-main flex flex-col gap-4">
         <!-- chatHistory here -->
       </div>
     </div>
+
+
 
     <!-- 
     input bar. 
@@ -157,7 +179,7 @@
     The label tag: All untriggered click events in label (including the padding areas) 
     will trigger the textarea focus().
     -->
-    <label class=" h-[50vh] shrink-0 pointer-events-none sticky bottom-0 left-0 right-0 flex flex-col-reverse">
+    <label class="h-[50vh] shrink-0 pointer-events-none sticky bottom-0 left-0 right-0 flex flex-col-reverse">
       <!-- The bottom gap is bg-white. Must be below the shadow of input bar -->
       <div class="pb-[1em] bg-white pointer-events-auto"></div>
       <!-- The top half of the bar, especially the rounded corner, is transparent -->
@@ -200,6 +222,14 @@
     const searchInput = document.getElementById('searchInput');
     const modelSelector = document.getElementById('modelSelector');
     const settingsBtn = document.getElementById('settingsBtn');
+    const foldBtn = document.getElementById('foldBtn');
+
+    const newChatBtn2 = document.getElementById('newChatBtn2');
+    const foldBtn2 = document.getElementById('foldBtn2');
+
+    const mainChat = document.getElementById('mainChat');
+    const sideBar = document.getElementById('sideBar');
+    const sideBar2 = document.getElementById('sideBar2');
 
 
 
@@ -207,6 +237,39 @@
     let messages = [];
     let currentSessionId = null;
     let db = null;
+
+
+
+
+    // view management
+    let isFolded = false;
+    function foldChanged() {
+      // const isMobile = window.innerWidth < 640;
+      if (isFolded) {
+        sideBar.style.display = 'none';
+        sideBar2.style.display = 'flex';
+        // sidebar is w-72 = 288px, 36=9rem=144px
+        mainChat.style.marginLeft = '120px';
+        mainChat.style.marginRight = '120px';
+        
+      } else {
+        sideBar.style.display = 'flex';
+        sideBar2.style.display = 'none';
+        mainChat.style.marginLeft = '0';
+        mainChat.style.marginRight = '0';
+      }
+    }
+    foldChanged();
+    foldBtn.addEventListener('mousedown', () => {
+      isFolded = true;
+      foldChanged();
+    });
+    foldBtn2.addEventListener('mousedown', () => {
+      isFolded = false;
+      foldChanged();
+    });
+    window.addEventListener('resize', foldChanged);
+
 
 
 
@@ -253,6 +316,8 @@
         e.preventDefault();
       }
     });
+
+
 
 
     // set up markdown styles with unocss
@@ -725,6 +790,7 @@
     // --- chat ui logic ---
 
     newChatBtn.onmousedown = createNewChat;
+    newChatBtn2.onmousedown = createNewChat;
     searchInput.addEventListener('input', renderSidebar);
 
 
