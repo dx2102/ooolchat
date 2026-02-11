@@ -5,25 +5,71 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OoolChat</title>
+  <meta name="description" content="The clean and fast LLM chat interface.">
+
+  <script>
+    let erudaCounter = 0;
+    function loadEruda() {
+      erudaCounter++;
+      console.log("Eruda counter:", erudaCounter);
+      if (erudaCounter !== 5) {
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/eruda@3.4.3/eruda.min.js';
+      script.onload = () => {
+        eruda.init();
+        console.log('Eruda loaded');
+      };
+      document.body.appendChild(script);
+    }
+  </script>
 
   <!-- unocss + css reset -->
   <script>
     // configure unocss before loading the runtime
     window.__unocss = {
+      theme: {
+        breakpoints: {
+          sm: '640px',
+          md: '768px',
+          lg: '1024px',
+          xl: '1280px',
+          '2xl': '1400px',  // was 1536px
+          '3xl': '1600px',
+          '4xl': '2000px',
+        },
+      },
       shortcuts: {
-        // 'mx-main': 'max-w-6xl mx-auto px-6 md:px-12 lg:px-20 xl:px-28',
-        'mx-main': 'px-1/12 md:px-1/9',
+        'px-main': 'px-1/12 md:px-1/9 2xl:px-1/6 3xl:px-1/5',
+        'scrollbar-hide': '[ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
       },
     }
+
+    // print window size
+    window.addEventListener('resize', () => {
+      console.log(`Window size: ${window.innerWidth}x${window.innerHeight}`);
+    });
   </script>
-  <link fetchpriority="high" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@unocss/reset@0.60.0/tailwind.min.css">
-  <script fetchpriority="high" src="https://cdn.jsdelivr.net/npm/@unocss/runtime@66.6.0"></script>
   <style>
     /* hide the page before unocss is ready */
     [un-cloak] {
       display: none !important;
     }
+
+    html::-webkit-scrollbar {
+      display: none;
+    }
+
+    html {
+      -ms-overflow-style: none;
+      /* IE and Edge */
+      scrollbar-width: none;
+      /* Firefox */
+    }
   </style>
+  <link fetchpriority="high" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@unocss/reset@0.60.0/tailwind.min.css">
+  <script fetchpriority="high" src="https://cdn.jsdelivr.net/npm/@unocss/runtime@66.6.0"></script>
 
   <!-- 
     unocss only set the css classes after DOMContentLoaded
@@ -42,7 +88,7 @@
 
 </head>
 
-<body un-cloak class="flex h-dvh bg-white font-sans touch-manipulation">
+<body un-cloak class="text-lg flex h-dvh bg-white font-sans touch-manipulation no-scrollbar">
   <!-- 
     h-dvh: "device height". Different from h-screen.
     In iOS Safari the browser bar can resize and take extra height.
@@ -56,7 +102,12 @@
   <aside
     class="text-base w-72 overflow-y-scroll flex-shrink-0  bg-gray-50 border-r border-gray-200 overflow-hidden flex flex-col">
 
-    <div class="sticky top-0 px-2 py-1 bg-gray-50">
+    <!-- 
+    sticky is better than flex/absolute because it can bubble scroll events upwards.
+    user can scroll the sidebar under these buttons, 
+    even when the mouse is over buttons.
+    -->
+    <div class="sticky top-0 mx-2 py-1 bg-gray-50">
       <button id="newChatBtn" class="w-full py-2 px-3 rounded-lg bg-gray-50 hover:bg-gray-200 flex">
         ✏️ New Chat
       </button>
@@ -65,13 +116,14 @@
     </div>
 
     <div class="px-2 flex-grow">
-      <div class="pl-2 py-0 text-gray-300 select-none">Recent</div>
+      <div class="pl-2 text-gray-300 select-none" onclick="loadEruda()">Recent</div>
       <!-- sessionList here -->
       <div id="sessionList"></div>
       <div class="w-fit mx-auto text-2xl py-1 select-none">☁️</div>
     </div>
 
     <div class="sticky bottom-0 px-2 py-1 flex bg-gray-50 border-t  border-gray-200">
+      <label for="modelSelector" class="sr-only">Select Model</label>
       <select id="modelSelector"
         class="flex-grow h-10 px-2 rounded-lg bg-gray-50 @hover:bg-gray-200 appearance-none focus:outline-none">
         <option value="google/gemini-3-flash-preview">💡 Gemini 3 Flash</option>
@@ -79,7 +131,6 @@
         <option value="deepseek/deepseek-r1-0528:free">💡 Deepseek R1 0528 (free)</option>
         <option value="moonshotai/kimi-k2.5">💡 Kimi K2.5</option>
       </select>
-      <!-- <div class="my-1 border-l border-gray-300"></div> -->
       <button id="settingsBtn" title="Settings" class="w-10 h-10 rounded-lg bg-gray-100 @hover:bg-gray-200
         ">⚙️</button>
     </div>
@@ -87,21 +138,30 @@
 
   <!-- main chat area -->
   <!-- anchor for the input bar -->
-  <div class="text-lg flex-grow overflow-y-scroll flex flex-col relative">
-    <!-- scroll area inside the anchor -->
+  <main class="flex-grow overflow-y-scroll flex flex-col relative">
     <div class="flex-grow select-none">
-      <!-- do mx-auto -->
-      <div id="chatHistory" class="select-text mx-main  pt-8 pb-[40vh]  flex flex-col gap-4">
+      <div id="chatHistory" class="select-text px-main  pt-8  flex flex-col gap-4">
         <!-- chatHistory here -->
       </div>
     </div>
 
-    <!-- input bar -->
-    <label class="text-lg mx-main sticky bottom-0 left-0 right-0 flex flex-col-reverse">
+    <!-- 
+    input bar. 
+
+    This is sticky and min-h-[50vh] so it creates a 1/2 screen margin below the main.
+
+    The textarea never grows beyond 50vh, so the input bar won't cover the main elements.
+    As the textarea grows, the height of label is still 50vh, 
+    so the main does not resize, and the scrollbar does not show up.
+
+    The label tag: All untriggered click events in label (including the padding areas) 
+    will trigger the textarea focus().
+    -->
+    <label class=" h-[50vh] shrink-0 pointer-events-none sticky bottom-0 left-0 right-0 flex flex-col-reverse">
       <!-- The bottom gap is bg-white. Must be below the shadow of input bar -->
-      <div class="pb-4 pt-0.5 bg-white"></div>
+      <div class="pb-[1em] bg-white pointer-events-auto"></div>
       <!-- The top half of the bar, especially the rounded corner, is transparent -->
-      <div style="
+      <div class="px-main pointer-events-auto" style="
         background: linear-gradient(
         to bottom, 
         transparent 50%, 
@@ -110,7 +170,7 @@
         <!-- The textarea. Simply bg-white. -->
         <div class="flex items-center border border-gray-300 rounded-3xl shadow-sm bg-white">
           <textarea id="userInput"
-            class="min-w-0 max-h-[40vh] flex-grow bg-transparent pl-5 pt-3 pb-3 pr-2  resize-none focus:outline-none placeholder:pl-0.5"
+            class="min-w-0 max-h-[calc(50vh-3em)]  overflow-y-scroll flex-grow bg-transparent pl-5 pt-3 pb-3 pr-2  resize-none focus:outline-none placeholder:pl-0.5"
             rows="1" placeholder="Ask me anything"></textarea>
           <!-- 
             self-end keeps the button at the bottom when textarea grows, not in the middle
@@ -125,10 +185,10 @@
         </div>
       </div>
     </label>
-  </div>
+  </main>
 
 
-  <script type="module">
+  <script defer type="module">
 
     // --- DOM Elements ---
     const chatHistory = document.getElementById('chatHistory');
@@ -254,6 +314,10 @@
 
       for (const [tag, className] of Object.entries(styles)) {
         const { css } = await uno.generate(className, { preflights: false });
+        /*
+        uno = window.__unocss_runtime.uno;
+        (await uno.generate('h-40vh', { preflights: false })).css
+        */
         // for example: .m-2{margin:0.5rem;} 
 
         const tempSheet = new CSSStyleSheet();
@@ -302,7 +366,10 @@
         { type: 'script', url: 'https://cdn.jsdelivr.net/npm/markdown-it@14.1.0/dist/markdown-it.min.js' },
         // highlight.js
         { type: 'script', url: 'https://cdn.jsdelivr.net/npm/highlightjs@9.16.2/highlight.pack.min.js' },
-        { type: 'link', url: 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css' },
+        { type: 'link', url: 'https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css' },
+
+        // { type: 'script', url: 'https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js' },
+        // { type: 'link', url: 'https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css' },
         // katex
         { type: 'link', url: 'https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css' },
         { type: 'script', url: 'https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js' },
@@ -312,8 +379,11 @@
 
       await Promise.all(urls.map(item => new Promise((resolve, reject) => {
         const el = document.createElement(item.type === 'script' ? 'script' : 'link');
-        if (item.type === 'script') el.src = item.url;
-        else { el.rel = 'stylesheet'; el.href = item.url; }
+        if (item.type === 'script') {
+          el.src = item.url;
+        } else {
+          el.rel = 'stylesheet'; el.href = item.url;
+        }
         el.onload = resolve;
         el.onerror = reject;
         document.head.appendChild(el);
@@ -514,13 +584,14 @@
 
     // ios safari might invalidate db connection when user comes back. Re-init on pageshow.
     async function resumePage(event) {
-      console.log(event, document.visibilityState);
+      // console.log('resuming page for event:', event);
       userInput.dispatchEvent(new Event('input'))
       await initDB();
       await renderSidebar();
     }
-    // window.addEventListener('visibilitychange', resumePage);  // seems like db open() is never resolved in the 'invisible' stage before the page shows up
+    resumePage();
     window.addEventListener('pageshow', resumePage);
+    // seems like db open() is never resolved in the 'invisible' stage before the page shows up
 
     function clearChat() {
       chatHistory.innerHTML = '';
@@ -663,29 +734,15 @@
       });
     }
 
-    // if user is in some input method (eg. Chinese), don't treat Enter as submit
-    let isComposing = false;
-    let isComposingChangeTime = -100;
-    userInput.addEventListener('compositionstart', function () {
-      // console.log('composition start')
-      isComposing = true;
-      isComposingChangeTime = performance.now();
-    });
-    userInput.addEventListener('compositionend', async function () {
-      // console.log('composition end')
-      isComposing = false;
-      isComposingChangeTime = performance.now();
-    });
-
     userInput.addEventListener('keydown', function (e) {
       // call API if Enter is pressed, but not Shift+Enter
-      // console.log(e, e.key, e.isComposing)
+      // console.log(e.isComposing, e.key, e.keyCode)
       if (e.key === 'Enter' && !e.shiftKey) {
-        if (isComposing || (performance.now() - isComposingChangeTime < 50)) {
+        if (e.isComposing || e.keyCode === 229) {
+          // key code 229 is deprecated, but e.isComposing does not behave well in safari
           console.log(
             'skipped Enter due to composition',
-            isComposing, isComposingChangeTime, performance.now(),
-            performance.now() - isComposingChangeTime
+            e.isComposing, e.key, e.keyCode
           );
           return;
         }
@@ -694,17 +751,37 @@
       }
     });
 
-    userInput.addEventListener('input', function (e) {
-      // automatic textarea height
-      userInput.style.height = 'auto';  // let the browser determine text height
-      let height = userInput.scrollHeight;
-      userInput.style.height = height + 'px';  // set new height
-    });
-    // async function initAutosize() {
-    //   const { default: autosize } = await import('https://cdn.jsdelivr.net/npm/autosize@6.0.1/+esm');
-    //   autosize(userInput);
+    function assert(condition) {
+      if (!condition) {
+        throw new Error('Assertion failed');
+      }
+    }
+
+    // userInput.addEventListener('input', async function (e) {
+    //   // automatic textarea height
+    //   const h1 = userInput.style.height;
+    //   const h2 = userInput.scrollHeight + 'px';
+
+    //   userInput.style.height = 'auto';  // let the browser determine text height
+
+    //   const h3 = userInput.style.height;  // -> auto
+    //   const h4 = userInput.scrollHeight + 'px';
+
+    //   console.log('input event', h1, h2, h3, h4)
+    //   if (h1 !== h4) {
+    //     userInput.style.height = h4;
+    //   }
+    // });
+    async function initAutosize() {
+      const { default: autosize } = await import('https://cdn.jsdelivr.net/npm/autosize@6.0.1/+esm');
+      autosize(userInput);
+    }
+    initAutosize();
+    // async function initScrollbar() {
+    //   const { default: SimpleBar } = await import('https://cdn.jsdelivr.net/npm/simplebar@6.2.3/+esm');
+    //   new SimpleBar(userInput, { autoHide: false });
     // }
-    // initAutosize();
+    // initScrollbar();
     userInput.addEventListener('input', (e) => {
       // scroll to bottom if cursor is at the end
       const cursorPosition = userInput.selectionStart;
@@ -717,6 +794,10 @@
 
 
     runLlmButton.onclick = runLlm;
+
+    function fullStringify(obj) {
+      return JSON.stringify(obj, Object.getOwnPropertyNames(obj), 2);
+    }
 
     async function runLlm() {
       let text = userInput.value.trimEnd();
@@ -756,7 +837,10 @@
       } catch (error) {
         // fullResponse += `\n\n>API Error: ${error.message}`;
         // appendMessage('assistant', fullResponse, true);
-        alert(`API Error: ${error.message}`);
+
+        // alert(`API Error:\n${error.message}\n\nHeaders:\n${fullStringify(error.headers)}`);
+        alert(`API Error:\n${error.message}\n\n${error.error.metadata.raw}`);
+        console.log(error.error.metadata.raw)
         console.error("API Error:", error);
       }
 
