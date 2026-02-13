@@ -34,16 +34,22 @@
     window.__unocss = {
       shortcuts: {
         'scrollbar-hide': '[ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+        'container-main': '[container-type:inline-size] [container-name:main]',
       },
+      variants: [
+        (matcher) => {
+          if (!matcher.startsWith('main-lg:')) return matcher
+          return {
+            matcher: matcher.slice('main-lg:'.length),
+            parent: `@container main (min-width: 768px)`,
+          }
+        }
+      ]
     }
 
     // add scrollbar-hide to root
     document.documentElement.classList.add('scrollbar-hide');
 
-    // print window size
-    window.addEventListener('resize', () => {
-      console.log(`Window size: ${window.innerWidth}x${window.innerHeight}`);
-    });
   </script>
   <style>
     /* hide the page before unocss is ready */
@@ -55,9 +61,16 @@
   <script fetchpriority="high" src="https://cdn.jsdelivr.net/npm/@unocss/runtime@66.6.0"></script>
 
   <style>
-    .px-main {
-      padding-inline: max(1rem,
-          calc(100% - 768px) / 2)
+    @container main (min-width: 1px) {
+      .px-main {
+        padding-inline: 1rem
+      }
+    }
+
+    @container main (min-width: 768px) {
+      .px-main {
+        padding-inline: max(3.5rem, calc(100% - 768px) / 2)
+      }
     }
   </style>
   <!-- 
@@ -88,8 +101,13 @@
 
     The "@hover:" below is a unocss feature. It won't trigger on touch devices.
   -->
-  <aside id="sideBar"
-    class="text-base w-72 overflow-y-scroll  flex-shrink-0  bg-gray-50 border-r border-gray-200 flex relative flex-col">
+  <aside id="sideBar" class="
+    text-base w-72 overflow-y-scroll flex-shrink-0
+    bg-gray-50 border-r border-gray-200 flex flex-col
+
+    fixed left-0 top-0 bottom-0 shadow-2xl z-10
+    sm:static sm:shadow-none
+    ">
     <!-- 
     sticky is better than flex/absolute because it can bubble scroll events upwards.
     user can scroll the sidebar even when the mouse is over buttons.
@@ -128,7 +146,7 @@
           <p>OoolChat</p>
         </a>
         <div class="flex-grow"></div>
-        <button id="foldBtn" title="Fold Sidebar" class="w-10 h-10 text-lg rounded-lg @hover:bg-gray-200 cursor-col-resize
+        <button id="foldBtn" title="Fold Sidebar" class="w-10 h-10 text-lg rounded-lg @hover:bg-gray-200
         ">«</button>
       </div>
     </div>
@@ -136,16 +154,17 @@
 
   <!-- main chat area -->
   <!-- anchor for the input bar -->
-  <main id="mainChat" class="flex-grow overflow-y-scroll flex flex-col">
-    <div class="absolute z-10 top-0 left-0 right-0 p-1">
-      <div id="sideBar2" class="rounded-lg bg-gray-50 w-fit">
-        <button id="newChatBtn2" class="w-10 h-10 rounded-lg bg-gray-50 hover:bg-gray-200">✏️</button>
-        <button id="foldBtn2" class="w-10 h-10 rounded-lg hover:bg-gray-200">»</button>
+  <main id="mainChat" class="flex-grow overflow-y-scroll flex flex-col container-main">
+    <!-- small sideBar2 -->
+    <div class="absolute z-10 top-0 left-0 right-0 main-lg:p-1">
+      <div id="sideBar2" class="bg-gray-50 rounded-lg main-lg:w-fit flex main-lg:flex-col">
+        <button id="newChatBtn2" class="w-10 h-10 rounded-lg bg-gray-50 @hover:bg-gray-200">✏️</button>
+        <button id="foldBtn2" class="w-10 h-10 rounded-lg @hover:bg-gray-200">»</button>
       </div>
     </div>
 
     <div class="flex-grow select-none relative">
-      <div id="chatHistory" class="select-text pt-8 px-main flex flex-col gap-4">
+      <div id="chatHistory" class="select-text pt-12 px-main flex flex-col gap-4">
         <!-- chatHistory here -->
       </div>
     </div>
@@ -164,11 +183,11 @@
     The label tag: All untriggered click events in label (including the padding areas) 
     will trigger the textarea focus().
     -->
-    <label class="h-[50vh] shrink-0 pointer-events-none sticky bottom-0 left-0 right-0 flex flex-col-reverse">
+    <label class="h-[50vh] px-main shrink-0 pointer-events-none sticky bottom-0 left-0 right-0 flex flex-col-reverse">
       <!-- The bottom gap is bg-white. Must be below the shadow of input bar -->
       <div class="pb-[1em] bg-white pointer-events-auto"></div>
       <!-- The top half of the bar, especially the rounded corner, is transparent -->
-      <div class="px-main pointer-events-auto" style="
+      <div class=" pointer-events-auto" style="
         background: linear-gradient(
         to bottom, 
         transparent 50%, 
@@ -229,22 +248,18 @@
     // view management
     let isFolded = false;
     function isMobile() {
-      return window.innerWidth < 640;
+      // return window.innerWidth < 640;
+      return window.matchMedia("(max-width: 640px)").matches;
     }
-    if (isMobile()) {
-      isFolded = true;  // hide sidebar on mobile initially
-    }
-
     function foldChanged() {
-      // const isMobile = window.innerWidth < 640;
       if (isFolded) {
         // Folded: hide sidebar, show shidebar2/main
         sideBar.style.display = 'none';
         sideBar2.style.display = 'flex';
       } else {
         // Unfolded:
-        // show sidebar, hide sidebar2
-        // show main on desktop but not on mobile
+        // show sidebar/main, hide sidebar2
+        // sidebar will be stacked on top of main on mobile
         sideBar.style.display = 'flex';
         sideBar2.style.display = 'none';
       }
@@ -254,74 +269,18 @@
       isFolded = true;
       foldChanged();
     });
-    foldBtn2.addEventListener('mousedown', () => {
+    foldBtn2.addEventListener('mousedown', (e) => {
       isFolded = false;
       foldChanged();
+      e.stopPropagation();  // prevent triggering mainChat mousedown, which will fold the sidebar again immediately on mobile
     });
-    // window.addEventListener('resize', foldChanged);
-
-
-
-    // allow users to resize the sidebar
-    // let isResizing = false;
-    // let lastDownX = 0;
-    // let sideBarWidth, sideBarLeft;
-    // document.addEventListener('DOMContentLoaded', () => {
-    //   const rect = sideBar.getBoundingClientRect();
-    //   sideBarWidth = rect.width;
-    //   sideBarLeft = rect.left;
-    //   console.log('Sidebar left:', sideBarLeft, ' width:', sideBarWidth);
-    // });
-    // console.log('Sidebar left:', sideBarLeft, ' width:', sideBarWidth);
-    // function mouseInDrag(e) {
-    //   console.log(Math.abs(e.clientX - (sideBarLeft + sideBarWidth)) < 10
-    //     && (sideBar.style.display !== 'none'),
-    //     Math.abs(e.clientX - (sideBarLeft + sideBarWidth)),
-    //     (sideBar.style.display !== 'none')
-    //   )
-    //   return (
-    //     Math.abs(e.clientX - (sideBarLeft + sideBarWidth)) < 10
-    //     && (sideBar.style.display !== 'none')
-    //   )
-    // }
-    // let dragSetTimer = null;
-    // document.addEventListener('mousemove', (e) => {
-    //   if (mouseInDrag(e)) {
-    //     if (dragSetTimer) return;
-    //     dragSetTimer = setTimeout(() => {
-    //       document.body.style.cursor = 'col-resize';
-    //     }, 300);  
-    //     // if we set 'col-resize' instantly without timeout, 
-    //     // the icon may change everytime the mouse moves between sidebar and main
-    //     // which is annoying. Add latency to reduce the frequency of this.
-    //   } else {
-    //     document.body.style.cursor = 'default';
-    //     clearTimeout(dragSetTimer);
-    //   }
-    // });
-    // document.addEventListener('mousedown', (e) => {
-    //   if (mouseInDrag(e)) {
-    //     // near the right edge
-    //     isResizing = true;
-    //     lastDownX = e.clientX;
-    //     e.preventDefault();
-    //   }
-    // });
-    // document.addEventListener('mousemove', (e) => {
-    //   if (!isResizing) return;
-    //   const offset = e.clientX - lastDownX;
-
-    //   sideBarWidth += offset;
-    //   sideBarWidth = Math.max(100, Math.min(sideBarWidth, 600));
-    //   sideBar.style.width = `${sideBarWidth}px`;
-    //   lastDownX = e.clientX;
-    // });
-    // document.addEventListener('mouseup', () => {
-    //   isResizing = false;
-    // });
-    // document.addEventListener('mouseleave', () => {
-    //   isResizing = false;
-    // });
+    mainChat.addEventListener('mousedown', () => {
+      // console.log(1, isMobile(), isFolded, sideBar2.contains(document.activeElement));
+      if (!isFolded && isMobile()) {
+        isFolded = true;
+        foldChanged();
+      }
+    });
 
 
 
@@ -403,10 +362,9 @@
 
       // table
       '.prose table': 'mt-2 mb-1 w-full border-collapse table-auto',
-      '.prose thead tr': ' border-b border-gray-300',
+      '.prose thead tr': 'border-b border-gray-300',
       '.prose tbody tr': 'border-b border-gray-200',
       '.prose tbody tr:last-child': 'border-b-0',
-      '.prose tr': 'gap-2',
       '.prose th': 'py-2 px-2 text-left font-bold',
       '.prose td': 'py-2 px-2 text-left text-gray-900 ',
       '.prose th:first-child': 'pl-0',
@@ -550,6 +508,14 @@
     function renderMarkdown(text) {
       let html = mdRenderer.render(text);
       let dom = (new DOMParser()).parseFromString(html, 'text/html').body;
+
+      // wrap table into div with display:block to enable horizontal scrolling
+      dom.querySelectorAll('table').forEach(table => {
+        const div = document.createElement('div');
+        div.className = 'overflow-x-auto max-w-full block';
+        table.parentNode.insertBefore(div, table);
+        div.appendChild(table);
+      });
 
       // add copy buttons to pre
       dom.querySelectorAll('pre').forEach(pre => {
@@ -724,8 +690,11 @@
       clearChat();
       messages = session.messages || [];
       messages.forEach(msg => appendMessage(msg.role, msg.content, false));
-      renderSidebar();
       requestAnimationFrame(() => userInput.focus());
+      if (!isFolded && isMobile()) {
+        isFolded = true;
+        foldChanged();
+      }
     }
 
     function createNewChat() {
