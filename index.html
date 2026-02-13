@@ -247,13 +247,15 @@
 
 
 
-
-    // view management
-    let isFolded = false;
     function isMobile() {
       // return window.innerWidth < 640;
       return window.matchMedia("(max-width: 640px)").matches;
     }
+    const isAndroid = window.navigator.userAgent.toLowerCase().includes('android');
+    const canHover = window.matchMedia("(hover: hover)").matches;
+
+    // view management
+    let isFolded = false;
     function foldChanged() {
       if (isFolded) {
         // Folded: hide sidebar, show shidebar2/main
@@ -275,10 +277,10 @@
     foldBtn2.addEventListener('mousedown', (e) => {
       isFolded = false;
       foldChanged();
-      e.stopPropagation();  // prevent triggering mainChat mousedown, which will fold the sidebar again immediately on mobile
+      e.stopPropagation();  // prevent triggering mainChat mousedown
     });
     mainChat.addEventListener('mousedown', () => {
-      // console.log(1, isMobile(), isFolded, sideBar2.contains(document.activeElement));
+      // for sm: devices, sidebar is stacked on top of the main. Clicks on main can fold the sidebar
       if (!isFolded && isMobile()) {
         isFolded = true;
         foldChanged();
@@ -287,13 +289,18 @@
 
 
 
-
     // autofocus
+    function inputFocus() {
+      // prevent android phones from poping up the virtual keyboard
+      // iOS browsers already block focus by default
+      if (isAndroid && !canHover) return;
+      requestAnimationFrame(() => userInput.focus());
+    }
     setTimeout(() => {
-      userInput.focus();
+      inputFocus();
     }, 100);
     document.addEventListener('DOMContentLoaded', () => {
-      userInput.focus();
+      inputFocus();
     });
     // capture uneffective keydown events, when not focused on input
     document.addEventListener('keydown', (e) => {
@@ -304,7 +311,7 @@
 
       // allow pasting
       if ((e.ctrlKey || e.metaKey) && e.key == 'v') {
-        userInput.focus();
+        inputFocus();
         return;
       }
 
@@ -324,14 +331,13 @@
       if (window.getSelection().toString().length > 0) return;
 
       if (e.key.length === 1) {
-        userInput.focus();
+        inputFocus();
       }
       if (e.key === ' ') {
-        userInput.focus();
+        inputFocus();
         e.preventDefault();
       }
     });
-
 
 
 
@@ -693,7 +699,8 @@
       clearChat();
       messages = session.messages || [];
       messages.forEach(msg => appendMessage(msg.role, msg.content, false));
-      requestAnimationFrame(() => userInput.focus());
+      requestAnimationFrame(() => inputFocus());
+      renderSidebar();
       if (!isFolded && isMobile()) {
         isFolded = true;
         foldChanged();
@@ -704,7 +711,7 @@
       currentSessionId = null;
       clearChat();
       renderSidebar();
-      requestAnimationFrame(() => userInput.focus());
+      requestAnimationFrame(() => inputFocus());
     }
 
     function replaceDom(target, content) {
@@ -744,7 +751,7 @@
         }
       });
 
-      // remove extra old children
+      // remove redundant old children
       while (target.childNodes.length > contentChildren.length) {
         target.removeChild(target.lastChild);
       }
@@ -929,9 +936,8 @@
         // appendMessage('assistant', fullResponse, true);
 
         // alert(`API Error:\n${error.message}\n\nHeaders:\n${fullStringify(error.headers)}`);
-        alert(`API Error:\n${error.message}\n\n${error.error.metadata.raw}`);
-        console.log(error.error.metadata.raw)
-        console.error("API Error:", error);
+        alert(`API Error:\n${error?.message}\n\n${error?.error?.metadata?.raw}`);
+        console.error("API Error:", error, error?.message, error?.error?.metadata?.raw);
       }
 
       const streamingDiv = document.getElementById('streaming-msg');
