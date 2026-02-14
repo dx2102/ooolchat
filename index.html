@@ -133,6 +133,7 @@
         <select id="modelSelector"
           class="flex-grow min-w-0 h-10 px-2 rounded-lg bg-gray-50 @hover:bg-gray-200 appearance-none focus:outline-none">
           <option value="google/gemini-3-flash-preview">💡 Gemini 3 Flash</option>
+          <option value="z-ai/glm-5">💡 GLM 5</option>
           <option value="x-ai/grok-4.1-fast">💡 Grok 4.1 Fast</option>
           <option value="deepseek/deepseek-r1-0528:free">💡 Deepseek R1 0528 (free)</option>
           <option value="moonshotai/kimi-k2.5">💡 Kimi K2.5</option>
@@ -141,7 +142,7 @@
         ">⚙️</button>
       </div>
       <div class="flex">
-        <a class="h-10 pl-2 text-gray-300 font-semibold flex items-center" href="https://github.com/dx2102/ooolchat/"
+        <a class="h-10 pl-2 text-gray-300 font-semibold flex items-center select-none" 
           target="_blank">
           <p>OoolChat</p>
         </a>
@@ -926,10 +927,18 @@
         });
 
         for await (const chunk of stream) {
+          console.log(chunk.choices[0]);
           const content = chunk.choices[0]?.delta?.content || '';
-          console.log(content)
-          fullResponse += content;
+          const think = chunk.choices[0]?.delta?.reasoning || '';
+          console.log(content, think)
+          fullResponse += think + content;
           appendMessage('assistant', fullResponse, true);
+
+          let reason = chunk.choices[0]?.finish_reason || '' 
+          if (reason !== '' && reason !== 'stop') {
+            reason += chunk.choices[0]?.native_finish_reason || ''
+            throw new Error(`Finished. Reason: ${reason}`);
+          }
         }
       } catch (error) {
         // fullResponse += `\n\n>API Error: ${error.message}`;
