@@ -476,7 +476,9 @@
       // console.log(window.markdownit, window.hljs, window.katex, window.texmath);
 
       mdRenderer = window.markdownit({
-        html: true,
+        html: false,
+        linkify: true,
+        breaks: true,
         highlight: function (str, lang) {
           if (lang && window.hljs.getLanguage(lang)) {
             try {
